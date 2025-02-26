@@ -3,6 +3,7 @@
 import React from 'react';
 import { Typography, Button, Container, Tab, Tabs, Box } from '@mui/material';
 import { useRouter } from 'next/navigation';
+import TableComponent from '../../components/table';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -33,47 +34,87 @@ function a11yProps(index: number) {
   };
 }
 
+interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+interface Location {
+  id: string;
+  name: string;
+  address: string;
+}
+interface TableColumn<T> {
+  dataKey: keyof T;
+  label: string;
+  numeric?: boolean;
+  width?: number;
+}
+
+const userColumns: TableColumn<User>[] = [
+  { dataKey: 'id', label: 'ID', numeric: true },
+  { dataKey: 'firstName', label: 'First Name' },
+  { dataKey: 'lastName', label: 'Last Name' },
+  { dataKey: 'email', label: 'Email' },
+];
+
+const locationColumns: TableColumn<Location>[] = [
+  { dataKey: 'id', label: 'ID', numeric: true },
+  { dataKey: 'name', label: 'Name' },
+  { dataKey: 'address', label: 'Address' },
+];
+
+const createNewUser = (formData: { firstName: string; lastName: string; email: string }) => ({
+  id: Math.random().toString(36).substr(2, 5),
+  firstName: formData.firstName,
+  lastName: formData.lastName,
+  email: formData.email,
+});
+
+const createNewLocation = (formData: { name: string; address: string }) => ({
+  id: Math.random().toString(36).substr(2, 5),
+  name: formData.name,
+  address: formData.address,
+});
+
+
 const Dashboard = () => {
   const router = useRouter();
   const [value, setValue] = React.useState(0);
 
-  const handleLogout = () => {
-    router.push('/login'); // Redirect back to login on logout
-  };
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
   };
 
   return (
-    <Container maxWidth="lg" style={{position: 'relative' }}>
-      <Button 
-        variant="contained" 
-        color="secondary" 
-        onClick={handleLogout} 
-        style={{ position: 'absolute', top: '20px', right: '20px' }}
-      >
-        Logout
-      </Button>
-
-      <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+    <Container maxWidth="lg"style={{position: 'relative', width: "100%" }}>  
+    <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={value} onChange={handleChange} aria-label="basic tabs example">
-            <Tab label="Item One" {...a11yProps(0)} />
-            <Tab label="Item Two" {...a11yProps(1)} />
-            <Tab label="Item Three" {...a11yProps(2)} />
+            <Tab label="Locations" {...a11yProps(0)} />
+            <Tab label="Users" {...a11yProps(1)} />
           </Tabs>
         </Box>
       </Box>
 
       <CustomTabPanel value={value} index={0}>
-        Item One
+      <TableComponent
+        columns={userColumns}
+        initialData={[]} // Replace with real data later
+        entityName="User"
+        createNewItem={createNewUser}
+      />;
       </CustomTabPanel>
       <CustomTabPanel value={value} index={1}>
-        Item Two
-      </CustomTabPanel>
-      <CustomTabPanel value={value} index={2}>
-        Item Three
+      <TableComponent
+        columns={locationColumns}
+        initialData={[]} // Replace with real data later
+        entityName="Location"
+        createNewItem={createNewLocation}
+      />;
       </CustomTabPanel>
     </Container>
   );
