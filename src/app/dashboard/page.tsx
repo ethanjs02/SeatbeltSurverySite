@@ -1,122 +1,113 @@
 'use client';
 
 import React from 'react';
-import { Typography, Button, Container, Tab, Tabs, Box } from '@mui/material';
+import { 
+  Typography, 
+  Button, 
+  Container, 
+  Box, 
+  Grid, 
+  Paper, 
+  Card, 
+  CardContent, 
+  CardActions 
+} from '@mui/material';
 import { useRouter } from 'next/navigation';
-import TableComponent from '../../components/table';
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function CustomTabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`simple-tabpanel-${index}`}
-      aria-labelledby={`simple-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-    </div>
-  );
-}
-
-function a11yProps(index: number) {
-  return {
-    id: `simple-tab-${index}`,
-    'aria-controls': `simple-tabpanel-${index}`,
-  };
-}
-
-interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-}
-
-interface Location {
-  id: string;
-  name: string;
-  address: string;
-}
-interface TableColumn<T> {
-  dataKey: keyof T;
-  label: string;
-  numeric?: boolean;
-  width?: number;
-}
-
-const userColumns: TableColumn<User>[] = [
-  { dataKey: 'id', label: 'ID', numeric: true },
-  { dataKey: 'firstName', label: 'First Name' },
-  { dataKey: 'lastName', label: 'Last Name' },
-  { dataKey: 'email', label: 'Email' },
-];
-
-const locationColumns: TableColumn<Location>[] = [
-  { dataKey: 'id', label: 'ID', numeric: true },
-  { dataKey: 'name', label: 'Name' },
-  { dataKey: 'address', label: 'Address' },
-];
-
-const createNewUser = (formData: { firstName: string; lastName: string; email: string }) => ({
-  id: Math.random().toString(36).substr(2, 5),
-  firstName: formData.firstName,
-  lastName: formData.lastName,
-  email: formData.email,
-});
-
-const createNewLocation = (formData: { name: string; address: string }) => ({
-  id: Math.random().toString(36).substr(2, 5),
-  name: formData.name,
-  address: formData.address,
-});
-
+import AuthGuard from '../../components/AuthGuard';
+import PeopleIcon from '@mui/icons-material/People';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import StorageIcon from '@mui/icons-material/Storage';
 
 const Dashboard = () => {
   const router = useRouter();
-  const [value, setValue] = React.useState(0);
 
-
-  const handleChange = (event: React.SyntheticEvent, newValue: number) => {
-    setValue(newValue);
-  };
+  const dashboardItems = [
+    {
+      title: 'Users',
+      description: 'Manage user accounts and permissions',
+      icon: <PeopleIcon fontSize="large" color="primary" />,
+      action: () => router.push('/users')
+    },
+    {
+      title: 'Locations',
+      description: 'Manage site locations and addresses',
+      icon: <LocationOnIcon fontSize="large" color="primary" />,
+      action: () => router.push('/locations')
+    },
+    {
+      title: 'Data Collections',
+      description: 'View and upload data to collections',
+      icon: <StorageIcon fontSize="large" color="primary" />,
+      action: () => router.push('/data')
+    }
+  ];
 
   return (
-    <Container maxWidth="lg"style={{position: 'relative', width: "100%" }}>  
-    <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={value} onChange={handleChange} aria-label="basic tabs example">
-            <Tab label="Locations" {...a11yProps(0)} />
-            <Tab label="Users" {...a11yProps(1)} />
-          </Tabs>
+    <AuthGuard>
+      <Container maxWidth="lg">
+        <Box py={4}>
+          <Typography variant="h4" component="h1" fontWeight="bold" mb={4} textAlign="center">
+            Admin Dashboard
+          </Typography>
+          
+          <Grid container spacing={4} justifyContent="center">
+            {dashboardItems.map((item, index) => (
+              <Grid item xs={12} sm={6} md={4} key={index}>
+                <Card 
+                  elevation={2}
+                  sx={{ 
+                    height: '100%', 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 4
+                    },
+                    maxWidth: 350,
+                    mx: 'auto'
+                  }}
+                >
+                  <CardContent sx={{ 
+                    flexGrow: 1, 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    p: 4
+                  }}>
+                    <Box mb={3}>
+                      {React.cloneElement(item.icon, { fontSize: 'large', style: { fontSize: '3rem' } })}
+                    </Box>
+                    <Typography variant="h5" component="h2" gutterBottom>
+                      {item.title}
+                    </Typography>
+                    <Typography variant="body1" color="text.secondary">
+                      {item.description}
+                    </Typography>
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: 'center', pb: 3 }}>
+                    <Button 
+                      size="large" 
+                      variant="contained" 
+                      onClick={item.action}
+                      sx={{ 
+                        px: 4, 
+                        py: 1,
+                        fontWeight: 'bold',
+                        borderRadius: 2
+                      }}
+                    >
+                      Access
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
         </Box>
-      </Box>
-
-      <CustomTabPanel value={value} index={0}>
-      <TableComponent
-        columns={userColumns}
-        initialData={[]} // Replace with real data later
-        entityName="User"
-        createNewItem={createNewUser}
-      />;
-      </CustomTabPanel>
-      <CustomTabPanel value={value} index={1}>
-      <TableComponent
-        columns={locationColumns}
-        initialData={[]} // Replace with real data later
-        entityName="Location"
-        createNewItem={createNewLocation}
-      />;
-      </CustomTabPanel>
-    </Container>
+      </Container>
+    </AuthGuard>
   );
 };
 
