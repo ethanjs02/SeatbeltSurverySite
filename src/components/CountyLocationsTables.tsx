@@ -20,12 +20,20 @@ import {
   InputAdornment,
   useMediaQuery,
   useTheme,
-  Grid
+  Grid,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle
 } from '@mui/material';
 import MapIcon from '@mui/icons-material/Place';
 import SearchIcon from '@mui/icons-material/Search';
+import ImageIcon from '@mui/icons-material/Image';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import { api } from '../services/api';
+import { useRouter } from 'next/navigation';
 
 // Define the Location interface based on the JSON example
 interface Location {
@@ -57,6 +65,10 @@ export default function CountyLocationsTables() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filteredLocations, setFilteredLocations] = useState<Location[]>([]);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState<boolean>(false);
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchLocations = async () => {
@@ -108,9 +120,11 @@ export default function CountyLocationsTables() {
           location.notes.toLowerCase().includes(term)
         );
         setFilteredLocations(filtered);
+        
       }
     }
   }, [selectedCounty, searchTerm, locationsData]);
+  
 
   const handleCountyChange = (county: string) => {
     setSelectedCounty(county);
@@ -123,6 +137,35 @@ export default function CountyLocationsTables() {
       window.open(`https://maps.google.com/?q=${location.latitude},${location.longitude}`, '_blank');
     }
   };
+
+  const handleDelete = (location: Location) => {
+    setSelectedLocation(location);
+    setOpenDeleteDialog(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (selectedLocation) {
+      try {
+        setDeleteLoading(true);
+        // Pass the site as an object with county and name properties
+        await api.locations.deleteLocation([{
+          county: selectedLocation.county, 
+          name: selectedLocation.name
+        }]);
+        const updatedLocations = locationsData[selectedCounty].filter(l => l.name !== selectedLocation.name);
+        setLocationsData({ ...locationsData, [selectedCounty]: updatedLocations });
+        setFilteredLocations(updatedLocations);
+        setSelectedLocation(null);
+        setOpenDeleteDialog(false);
+      } catch (err) {
+        console.error('Error deleting location:', err);
+        setError('Failed to delete location. Please try again later.');
+      } finally {
+        setDeleteLoading(false);
+      }
+    }
+  };
+  
 
   if (loading) {
     return (
@@ -156,8 +199,13 @@ export default function CountyLocationsTables() {
     );
   }
 
+  
+
   return (
     <Box>
+
+      
+      
       {/* County Selection */}
       <Box mb={4} sx={{ overflowX: 'auto' }}>
         <Typography variant="subtitle1" fontWeight="medium" mb={1}>
@@ -238,7 +286,9 @@ export default function CountyLocationsTables() {
                       <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Length</TableCell>
                     </>
                   )}
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Map</TableCell>
                   <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Images</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -276,21 +326,50 @@ export default function CountyLocationsTables() {
                         </>
                       )}
                       <TableCell>
-                        <Tooltip title="View on map">
+                        <Tooltip title="View on Map">
                           <IconButton 
                             size="small" 
                             color="primary"
                             onClick={() => openInMaps(location)}
                           >
-                            <MapIcon />
+                            <MapIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       </TableCell>
+                      <TableCell>
+                        <Tooltip title="Edit">
+                          <IconButton 
+                            size="small" 
+                            color="primary"
+                            onClick={() => router.push(`/locations/edit/${encodeURIComponent(location.name)}`)}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton 
+                            size="small" 
+                            color="error"
+                            onClick={() => handleDelete(location)}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                      <Tooltip title="Manage Images">
+                       <IconButton onClick={() => router.push(`/locations/images/${location.county}/${location.name}`)}>
+                        <ImageIcon fontSize="small" />
+                       </IconButton>
+                        </Tooltip>
+
+                      </TableCell>
+                      
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={isMobile ? 4 : 6} align="center">
+                    <TableCell colSpan={isMobile ? 5 : 7} align="center">
                       <Typography py={2}>
                         No locations match your search. Try a different search term.
                       </Typography>
@@ -302,6 +381,39 @@ export default function CountyLocationsTables() {
           </TableContainer>
         </Box>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={openDeleteDialog}
+        onClose={() => !deleteLoading && setOpenDeleteDialog(false)}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">Confirm Location Deletion</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            Are you sure you want to delete the location "{selectedLocation?.name}" in {selectedCounty} County? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => setOpenDeleteDialog(false)} 
+            color="primary"
+            disabled={deleteLoading}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmDelete} 
+            color="error" 
+            autoFocus
+            disabled={deleteLoading}
+            startIcon={deleteLoading ? <CircularProgress size={20} /> : undefined}
+          >
+            {deleteLoading ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 } 

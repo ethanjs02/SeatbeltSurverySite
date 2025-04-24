@@ -80,35 +80,71 @@ const apiRequest = async <T>(
     }
     
     const fullUrl = `${apiBaseUrl}${endpoint}`;
-    console.log('Making request to:', fullUrl);
-    console.log('With headers:', headers);
+    console.log(`API Request: ${method} ${fullUrl}`);
+    console.log('Request Headers:', headers);
+    if (body) {
+      console.log('Request Body:', JSON.stringify(body, null, 2));
+    }
     
     const response = await fetch(fullUrl, config);
     
+    console.log(`Response Status: ${response.status} ${response.statusText}`);
+    
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `API request failed with status ${response.status}`);
+      // Try to get more detailed error information
+      try {
+        // Clone the response to be able to read it twice
+        const clonedResponse = response.clone();
+        
+        // Try to parse as JSON first
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error Response (JSON):', errorData);
+        
+        // If that fails, try to get the raw text
+        if (Object.keys(errorData).length === 0) {
+          const textResponse = await clonedResponse.text();
+          console.error('API Error Response (Text):', textResponse);
+        }
+        
+        // Custom error message based on status code
+        if (response.status === 500) {
+          throw new Error(errorData.message || 'Internal Server Error: The server encountered an unexpected condition.');
+        } else if (response.status === 400) {
+          throw new Error(errorData.message || 'Bad Request: The server could not understand the request.');
+        } else if (response.status === 401) {
+          throw new Error(errorData.message || 'Unauthorized: Authentication is required or has failed.');
+        } else if (response.status === 403) {
+          throw new Error(errorData.message || 'Forbidden: You do not have permission to access this resource.');
+        } else if (response.status === 404) {
+          throw new Error(errorData.message || 'Not Found: The requested resource could not be found.');
+        } else {
+          throw new Error(errorData.message || `API request failed with status ${response.status}`);
+        }
+      } catch (parseError) {
+        console.error('Failed to parse error response:', parseError);
+        throw new Error(`API request failed with status ${response.status}`);
+      }
     }
     
     // Check if the response is empty
     const contentType = response.headers.get('content-type');
-    console.log('Content-Type:', contentType);
+    console.log('Response Content-Type:', contentType);
     
     if (contentType && contentType.includes('application/json')) {
       const jsonData = await response.json();
-      console.log('Response data:', jsonData);
+      console.log('Response Data:', jsonData);
       return jsonData;
     } else {
        // Try to parse the text response as JSON first
        try {
         const textData = await response.text();
-        console.log('Raw text response:', textData);
+        console.log('Raw Text Response:', textData);
         
         // Try to parse as JSON
         if (textData && textData.trim()) {
           try {
             const parsedData = JSON.parse(textData);
-            console.log('Successfully parsed text as JSON:', parsedData);
+            console.log('Parsed JSON from Text:', parsedData);
             return parsedData;
           } catch (parseError) {
             console.log('Failed to parse text as JSON, returning as is');
@@ -125,7 +161,7 @@ const apiRequest = async <T>(
       }
     }
   } catch (error) {
-    console.error('API request error:', error);
+    console.error('API Request Error:', error);
     throw error;
   }
 };
@@ -159,9 +195,11 @@ export const api = {
         fileData,
         { 'Content-Type': 'multipart/form-data' }
       );
-    }
+    },
+
+    
   },
-  
+
   // User management endpoints
   users: {
     /**
@@ -175,28 +213,35 @@ export const api = {
      * Create new user
      */
     createUser: (userData: any) => {
-      return apiRequest<any>('/admin/users/create', 'POST', userData);
+      // Format according to API documentation with users array
+      return apiRequest<any>('/admin/users/create', 'POST', {
+        users: [userData]
+      });
     },
     
     /**
      * Update existing user
      */
-    updateUser: (email: string, userData: any) => {
-      return apiRequest<any>(`/admin/users/update/${email}`, 'PUT', userData);
+    updateUser: (email: string, first_name: any, last_name: any) => {
+      // Format according to API documentation - using users array like the create endpoint
+      
+      return apiRequest<any>(`/admin/users/update`, 'PUT', {
+        email: email,
+        first_name: first_name,
+        last_name: last_name
+      });
     },
     
-    /**
-     * Get specific user
-     */
-    getUser: (email: string) => {
-      return apiRequest<any>(`/admin/users/read/${email}`);
-    },
+   
     
     /**
      * Delete user
      */
-    deleteUser: (email: string) => {
-      return apiRequest<any>(`/admin/users/delete/${email}`, 'DELETE');
+    deleteUser: (email: string | string[]) => {
+      const emails = Array.isArray(email) ? email : [email];
+      return apiRequest<any>(`/admin/users/delete`, 'POST', {
+        emails: emails
+      });
     }
   },
   
@@ -220,22 +265,97 @@ export const api = {
      * Create new location/site
      */
     createLocation: (locationData: any) => {
-      return apiRequest<any>('/admin/sites/create', 'POST', locationData);
+      // Create a body wrapper for Lambda integration
+      return apiRequest<any>('/admin/sites/create', 'POST', {
+        body: locationData
+      });
+      
     },
     
     /**
      * Update existing location/site
      */
     updateLocation: (locationId: string, locationData: any) => {
-      return apiRequest<any>(`/admin/sites/update/${locationId}`, 'PUT', locationData);
+      // Create a body wrapper for Lambda integration
+      return apiRequest<any>(`/admin/sites/update`, 'PUT',
+        
+        locationData
+        
+    );
     },
     
     /**
      * Delete location/site
      */
-    deleteLocation: (locationId: string) => {
-      return apiRequest<any>(`/admin/sites/delete/${locationId}`, 'DELETE');
+    deleteLocation: (locationId: string | string[] | {county: string, name: string}[]) => {
+      // If we have an array of location objects already (sites with county and name)
+      if (Array.isArray(locationId) && locationId.length > 0 && 
+          typeof locationId[0] === 'object' && 'county' in locationId[0]) {
+        return apiRequest<any>(`/admin/sites/delete`, 'POST', {
+          sites: locationId
+        });
+      }
+      
+      // If we have string IDs, we need to format them properly
+      // This assumes the locationId string is in the format "county_name"
+      const sites = Array.isArray(locationId) 
+        ? locationId.map(id => {
+            const [county, name] = (id as string).split('_');
+            return { county, name };
+          })
+        : (() => {
+            const [county, name] = (locationId as string).split('_');
+            return [{ county, name }];
+          })();
+      
+      return apiRequest<any>(`/admin/sites/delete`, 'POST', {
+        sites: sites
+      });
     }
+   
+  },
+  image: {
+    
+    fetchImages: (county: string, site: string) => {
+      return apiRequest<{images: string[]}>(`/admin/images/fetch?county=${encodeURIComponent(county)}&site=${encodeURIComponent(site)}`);
+    },
+    
+   
+    createImage: (county: string, siteName: string, fileName: string) => {
+      return apiRequest<{presignedUrl: string}>('/admin/images/create', 'POST', {
+        county,
+        siteName,
+        fileName
+      });
+    },
+    
+    
+    editImage: (county: string, siteName: string, fileName: string) => {
+      return apiRequest<{presignedUrl: string}>('/admin/images/update', 'POST', {
+          county,
+          siteName,
+          fileName
+      });
+    },
+    
+    
+    deleteImages: (images: Array<{county: string, siteName: string, fileName: string}>) => {
+      return apiRequest<{success: boolean}>('/admin/images/delete', 'POST', 
+        images
+      );
+    },
+    
+    
+    deleteImage: (county: string, siteName: string, fileName: string) => {
+      return apiRequest<{success: boolean}>('/admin/images/delete', 'POST', {
+        images: [{
+          county,
+          siteName,
+          fileName
+        }]
+      });
+    }
+
   },
   
   // Admin specific endpoints

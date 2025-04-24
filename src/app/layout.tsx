@@ -40,11 +40,7 @@ function AppContent({ children }: { children: ReactNode }) {
           {/* Show buttons only on the dashboard and when authenticated */}
           {isDashboard && isAuthenticated && (
             <Box sx={{ display: 'flex', gap: 3 }}>
-              <Link href="/data" passHref>
-                <Typography variant="body1" sx={{ textDecoration: 'underline', cursor: 'pointer', color: 'white' }}>
-                  View Data
-                </Typography>
-              </Link>
+              
               <Typography
                 variant="body1"
                 sx={{ textDecoration: 'underline', cursor: 'pointer', color: 'white' }}

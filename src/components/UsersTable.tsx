@@ -31,9 +31,6 @@ interface User {
   first_name?: string;
   last_name?: string;
   enabled?: boolean;  // Changed from status to enabled
-  role?: string;
-  createdAt?: string;
-  lastLogin?: string;
 }
 
 export default function UsersTable() {
@@ -65,9 +62,6 @@ export default function UsersTable() {
               first_name?: string;
               last_name?: string;
               enabled?: boolean;
-              role?: string;
-              createdAt?: string;
-              lastLogin?: string;
             }
           }
           
@@ -103,8 +97,7 @@ export default function UsersTable() {
     
     setDeleteLoading(true);
     try {
-      // Implement the deleteUser API call
-      // This would require adding the method to the api.users object
+      // Use the updated deleteUser API call that accepts emails array
       if (api.users.deleteUser) {
         await api.users.deleteUser(userToDelete.email);
         // Refresh the user list
@@ -134,19 +127,10 @@ export default function UsersTable() {
   };
 
   // Function to go to the edit user page
-  const goToEditUser = (email: string) => {
-    router.push(`/users/edit/${encodeURIComponent(email)}`);
-  };
-
-  // Get role display name
-  const getRoleDisplayName = (role?: string) => {
-    switch(role) {
-      case 'admin': return 'Administrator';
-      case 'manager': return 'Manager';
-      case 'user': return 'Standard User';
-      case 'readonly': return 'Read Only';
-      default: return role || 'N/A';
-    }
+  const goToEditUser = (user: User) => {
+    // Store user data in session storage for the edit page to retrieve
+    sessionStorage.setItem('editUserData', JSON.stringify(user));
+    router.push(`/users/edit/${encodeURIComponent(user.email)}`);
   };
 
   if (loading) {
@@ -192,17 +176,14 @@ export default function UsersTable() {
             <TableRow>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Email</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Name</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Role</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Status</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Created</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Last Login</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={4} align="center">
                   <Typography variant="body1" py={2}>No users found.</Typography>
                 </TableCell>
               </TableRow>
@@ -215,7 +196,6 @@ export default function UsersTable() {
                       ? `${user.first_name} ${user.last_name}`
                       : 'N/A'}
                   </TableCell>
-                  <TableCell>{getRoleDisplayName(user.role)}</TableCell>
                   <TableCell>
                     <Box
                       component="span"
@@ -231,22 +211,12 @@ export default function UsersTable() {
                     </Box>
                   </TableCell>
                   <TableCell>
-                    {user.createdAt 
-                      ? new Date(user.createdAt).toLocaleDateString() 
-                      : 'N/A'}
-                  </TableCell>
-                  <TableCell>
-                    {user.lastLogin 
-                      ? new Date(user.lastLogin).toLocaleDateString() 
-                      : 'Never'}
-                  </TableCell>
-                  <TableCell>
                     <Box display="flex">
                       <Tooltip title="Edit User">
                         <IconButton 
                           size="small" 
                           color="primary"
-                          onClick={() => goToEditUser(user.email)}
+                          onClick={() => goToEditUser(user)}
                         >
                           <EditIcon fontSize="small" />
                         </IconButton>

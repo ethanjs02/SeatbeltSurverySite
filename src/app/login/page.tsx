@@ -205,19 +205,7 @@ const LoginPage = () => {
           </Alert>
         )}
         
-        {debugInfo && (
-          <Alert severity="info" sx={{ mb: 2, width: '100%', fontSize: '0.75rem' }}>
-            <Typography variant="caption" component="div">Debug Info:</Typography>
-            <pre style={{ 
-              whiteSpace: 'pre-wrap', 
-              overflowX: 'auto', 
-              maxHeight: '100px',
-              fontSize: '0.7rem'
-            }}>
-              {debugInfo}
-            </pre>
-          </Alert>
-        )}
+
         
         <form onSubmit={handleLogin} style={{ width: '100%' }}>
           <TextField

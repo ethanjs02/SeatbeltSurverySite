@@ -18,26 +18,82 @@ export default function EditUserPage() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        // Check if the getUser method is implemented
-        if (!api.users.getUser) {
-          // If not implemented, we'll create a minimal user object with just the email
-          // In a real application, you would implement the getUser method
-          setUserData({ email });
-          setLoading(false);
-          return;
+        let userData = null;
+        
+        // First try to get user data from session storage
+        if (typeof window !== 'undefined') {
+          const storedData = sessionStorage.getItem('editUserData');
+          if (storedData) {
+            userData = JSON.parse(storedData);
+            console.log('User data retrieved from session storage:', userData);
+            
+            // If the email matches, use this data
+            if (userData.email === email) {
+              setUserData(userData);
+              setLoading(false);
+              return;
+            }
+          }
         }
         
-        const data = await api.users.getUser(email);
-        setUserData(data);
+        // If we couldn't get data from session storage, fetch all users and find the matching one
+        console.log('Fetching user data from API...');
+        const usersData = await api.users.getUsers();
+        
+        if (usersData) {
+          // Handle different response formats
+          let users: any[] = [];
+          
+          // If response is an object with a users array
+          if (typeof usersData === 'object' && usersData !== null && 'users' in usersData && Array.isArray(usersData.users)) {
+            users = usersData.users;
+          } 
+          // If response is already an array
+          else if (Array.isArray(usersData)) {
+            users = usersData;
+          }
+          // If response is an object with email keys
+          else if (typeof usersData === 'object' && usersData !== null) {
+            users = Object.keys(usersData).map(key => ({
+              email: key,
+              ...(usersData as Record<string, any>)[key]
+            }));
+          }
+          
+          // Find the user with matching email
+          const user = users.find(u => u.email === email);
+          
+          if (user) {
+            console.log('Found user in API response:', user);
+            setUserData(user);
+          } else {
+            // If user not found, create a minimal user object
+            console.log('User not found in API, creating minimal data');
+            setUserData({ email });
+          }
+        } else {
+          // If no data returned, create a minimal user object
+          setUserData({ email });
+        }
       } catch (err: any) {
         console.error('Error fetching user:', err);
         setError(err.message || 'Failed to load user details');
+        
+        // Still create a minimal user object so form can be displayed
+        setUserData({ email });
       } finally {
         setLoading(false);
       }
     };
     
     fetchUser();
+    
+    // Clear session storage data when component unmounts
+    return () => {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('editUserData');
+      }
+    };
   }, [email]);
   
   return (

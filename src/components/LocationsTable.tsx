@@ -15,11 +15,18 @@ import {
   Button,
   IconButton,
   Tooltip,
-  Link
+  Link,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle
 } from '@mui/material';
 import LinkIcon from '@mui/icons-material/Link';
 import MapIcon from '@mui/icons-material/Place';
+import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import { api } from '../services/api';
+import { useRouter } from 'next/navigation';
 
 // Define the Location interface based on your backend data structure
 interface Location {
@@ -44,6 +51,10 @@ export default function LocationsTable() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
+  const [locationToDelete, setLocationToDelete] = useState<Location | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchLocations = async () => {
@@ -181,78 +192,190 @@ export default function LocationsTable() {
     return 'Unknown';
   };
 
+  // Function to handle location deletion
+  const handleDeleteLocation = async () => {
+    if (!locationToDelete) return;
+    
+    setDeleteLoading(true);
+    try {
+      // Call the API to delete the location
+      // We need to determine the county for the location
+      const county = locationToDelete.country || "Unknown"; // Note: we should ideally have county info
+      
+      await api.locations.deleteLocation([{
+        county: county,
+        name: locationToDelete.name
+      }]);
+      
+      // Remove the deleted location from the state
+      setLocations(prev => prev.filter(loc => loc.name !== locationToDelete.name));
+      
+      setDeleteDialogOpen(false);
+      setLocationToDelete(null);
+    } catch (err: any) {
+      console.error('Error deleting location:', err);
+      setError(err.message || 'Failed to delete location. Please try again.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  // Function to open the delete confirmation dialog
+  const openDeleteDialog = (location: Location) => {
+    setLocationToDelete(location);
+    setDeleteDialogOpen(true);
+  };
+
+  // Function to navigate to the edit page
+  const goToEditLocation = (locationName: string) => {
+    router.push(`/locations/edit/${encodeURIComponent(locationName)}`);
+  };
+
+  // Function to navigate to the add location page
+  const goToAddLocation = () => {
+    router.push('/locations/add');
+  };
+
   return (
-    <TableContainer component={Paper} elevation={2}>
-      <Table sx={{ minWidth: 650 }} aria-label="locations table">
-        <TableHead sx={{ bgcolor: 'primary.main' }}>
-          <TableRow>
-            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Name</TableCell>
-            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Address</TableCell>
-            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Status</TableCell>
-            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Created</TableCell>
-            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {locations.map((location) => (
-            <TableRow key={location.id || location.name} hover>
-              <TableCell>
-                <Typography fontWeight="medium">{location.name}</Typography>
-                {location.description && (
-                  <Typography variant="caption" color="text.secondary">
-                    {location.description}
-                  </Typography>
-                )}
-              </TableCell>
-              <TableCell>{formatAddress(location)}</TableCell>
-              <TableCell>
-                <Box
-                  component="span"
-                  sx={{
-                    px: 1,
-                    py: 0.5,
-                    borderRadius: 1,
-                    bgcolor: getStatusColor(location),
-                    color: getStatusTextColor(location),
-                  }}
-                >
-                  {getStatusText(location)}
-                </Box>
-              </TableCell>
-              <TableCell>
-                {location.createdAt 
-                  ? new Date(location.createdAt).toLocaleDateString() 
-                  : 'N/A'}
-              </TableCell>
-              <TableCell>
-                <Box display="flex" gap={1}>
-                  {location.url && (
-                    <Tooltip title="Visit site">
+    <>
+      <Box display="flex" justifyContent="flex-end" mb={2}>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<AddIcon />}
+          onClick={goToAddLocation}
+        >
+          Add New Location
+        </Button>
+      </Box>
+
+      <TableContainer component={Paper} elevation={2}>
+        <Table sx={{ minWidth: 650 }} aria-label="locations table">
+          <TableHead sx={{ bgcolor: 'primary.main' }}>
+            <TableRow>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Names</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Address</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Status</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Created</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {locations.map((location) => (
+              <TableRow key={location.id || location.name} hover>
+                <TableCell>
+                  <Typography fontWeight="medium">{location.name}</Typography>
+                  {location.description && (
+                    <Typography variant="caption" color="text.secondary">
+                      {location.description}
+                    </Typography>
+                  )}
+                </TableCell>
+                <TableCell>{formatAddress(location)}</TableCell>
+                <TableCell>
+                  <Box
+                    component="span"
+                    sx={{
+                      px: 1,
+                      py: 0.5,
+                      borderRadius: 1,
+                      bgcolor: getStatusColor(location),
+                      color: getStatusTextColor(location),
+                    }}
+                  >
+                    {getStatusText(location)}
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  {location.createdAt 
+                    ? new Date(location.createdAt).toLocaleDateString() 
+                    : 'N/A'}
+                </TableCell>
+                <TableCell>
+                  <Box display="flex" gap={1} alignItems="center">
+                    {location.url && (
+                      <Tooltip title="Visit site">
+                        <IconButton 
+                          size="small" 
+                          color="primary"
+                          onClick={() => window.open(location.url, '_blank')}
+                        >
+                          <LinkIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    
+                    <Tooltip title="View on map">
                       <IconButton 
                         size="small" 
                         color="primary"
-                        onClick={() => window.open(location.url, '_blank')}
+                        onClick={() => openInMaps(location)}
                       >
-                        <LinkIcon />
+                        <MapIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                  )}
-                  
-                  <Tooltip title="View on map">
-                    <IconButton 
-                      size="small" 
-                      color="primary"
-                      onClick={() => openInMaps(location)}
-                    >
-                      <MapIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+
+                    <Tooltip title="Edit Location">
+                      <IconButton 
+                        size="small" 
+                        color="primary"
+                        onClick={() => goToEditLocation(location.name)}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    
+                    <Tooltip title="Delete Location">
+                      <IconButton 
+                        size="small" 
+                        color="error"
+                        onClick={() => openDeleteDialog(location)}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+      >
+        <DialogTitle id="delete-dialog-title">
+          Confirm Location Deletion
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="delete-dialog-description">
+            Are you sure you want to delete the location "{locationToDelete?.name}"? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => setDeleteDialogOpen(false)} 
+            color="primary"
+            disabled={deleteLoading}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteLocation} 
+            color="error" 
+            autoFocus
+            disabled={deleteLoading}
+            startIcon={deleteLoading ? <CircularProgress size={20} /> : undefined}
+          >
+            {deleteLoading ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 } 

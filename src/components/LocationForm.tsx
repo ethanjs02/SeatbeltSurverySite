@@ -33,26 +33,6 @@ interface LocationFormData {
 // Direction options
 const DIRECTIONS = ['NB', 'SB', 'EB', 'WB'];
 
-// Common Arkansas counties (add more as needed)
-const COMMON_COUNTIES = [
-  'Pulaski',
-  'Benton',
-  'Washington',
-  'Sebastian',
-  'Faulkner',
-  'Craighead',
-  'Saline',
-  'Garland',
-  'Jefferson',
-  'White',
-  'Lonoke',
-  'Pope',
-  'Baxter',
-  'Greene',
-  'Crittenden',
-  'Union'
-].sort();
-
 interface LocationFormProps {
   editMode?: boolean;
   initialData?: Partial<LocationFormData>;
@@ -60,7 +40,6 @@ interface LocationFormProps {
 
 export default function LocationForm({ editMode = false, initialData = {} }: LocationFormProps) {
   const router = useRouter();
-  const [counties, setCounties] = useState<string[]>(COMMON_COUNTIES);
   const [loading, setLoading] = useState<boolean>(false);
   const [success, setSuccess] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,12 +58,6 @@ export default function LocationForm({ editMode = false, initialData = {} }: Loc
     direction_of_travel: initialData.direction_of_travel || '',
     notes: initialData.notes || ''
   });
-
-  // Fetch counties if needed (could be fetched from backend)
-  useEffect(() => {
-    // This could be replaced with an API call to get counties from backend
-    // For now we're using the predefined list
-  }, []);
 
   // Handle form field changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -140,6 +113,9 @@ export default function LocationForm({ editMode = false, initialData = {} }: Loc
     setLoading(true);
     
     try {
+      // Log the data being sent for debugging
+      console.log('Submitting location data:', formData);
+      
       if (editMode && initialData.name) {
         // Update existing location
         await api.locations.updateLocation(initialData.name, formData);
@@ -155,7 +131,21 @@ export default function LocationForm({ editMode = false, initialData = {} }: Loc
       }, 1500);
     } catch (err: any) {
       console.error('Error saving location:', err);
-      setError(err.message || 'Failed to save location. Please try again.');
+      
+      // Handle specific error cases based on API response
+      if (err.message && err.message.includes('already exists')) {
+        setError(`A location with this ID already exists. Please use a different ID.`);
+      } else if (err.message && err.message.includes('must be provided')) {
+        setError(`Both county and location ID must be provided. Please check required fields.`);
+      } else if (err.message && err.message.toLowerCase().includes('retrieving/updating csv')) {
+        setError(`There was an error updating the CSV file. The server reported: ${err.message}`);
+      } else if (err.message && err.message.toLowerCase().includes('unauthorized')) {
+        setError(`You don't have permission to perform this action. Please check your authorization.`);
+      } else if (err.message && err.message.toLowerCase().includes('internal server error')) {
+        setError(`The server encountered an internal error. Please try again or contact support if the issue persists.`);
+      } else {
+        setError(err.message || 'Failed to save location. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -184,7 +174,6 @@ export default function LocationForm({ editMode = false, initialData = {} }: Loc
           {/* County and Location ID */}
           <Grid item xs={12} sm={6}>
             <TextField
-              select
               label="County"
               name="county"
               value={formData.county}
@@ -192,15 +181,9 @@ export default function LocationForm({ editMode = false, initialData = {} }: Loc
               fullWidth
               required
               error={!!formErrors.county}
-              helperText={formErrors.county}
-              disabled={loading}
-            >
-              {counties.map(county => (
-                <MenuItem key={county} value={county}>
-                  {county}
-                </MenuItem>
-              ))}
-            </TextField>
+              helperText={formErrors.county || 'Enter the county name'}
+              disabled={loading || (editMode && !!initialData.county)}
+            />
           </Grid>
           <Grid item xs={12} sm={6}>
             <TextField

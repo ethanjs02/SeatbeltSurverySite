@@ -6,7 +6,6 @@ import {
   TextField,
   Button,
   Grid,
-  MenuItem,
   Paper,
   Typography,
   CircularProgress,
@@ -22,19 +21,8 @@ interface UserFormData {
   email: string;
   first_name: string;
   last_name: string;
-  role?: string;
   enabled: boolean;
-  password?: string;
-  confirmPassword?: string;
 }
-
-// Roles available in the system
-const ROLES = [
-  { value: 'admin', label: 'Administrator' },
-  { value: 'manager', label: 'Manager' },
-  { value: 'user', label: 'Standard User' },
-  { value: 'readonly', label: 'Read Only' }
-];
 
 interface UserFormProps {
   editMode?: boolean;
@@ -53,10 +41,7 @@ export default function UserForm({ editMode = false, initialData = {} }: UserFor
     email: initialData.email || '',
     first_name: initialData.first_name || '',
     last_name: initialData.last_name || '',
-    role: initialData.role || 'user',
-    enabled: initialData.enabled !== undefined ? initialData.enabled : true,
-    password: '',
-    confirmPassword: ''
+    enabled: initialData.enabled !== undefined ? initialData.enabled : true
   });
 
   // Handle form field changes
@@ -93,29 +78,6 @@ export default function UserForm({ editMode = false, initialData = {} }: UserFor
       errors.email = 'Please enter a valid email address';
     }
     
-    // Password validation - only required for new users
-    if (!editMode) {
-      if (!formData.password) errors.password = 'Password is required for new users';
-      if (formData.password && formData.password.length < 8) {
-        errors.password = 'Password must be at least 8 characters';
-      }
-      if (!formData.confirmPassword) errors.confirmPassword = 'Please confirm your password';
-      if (formData.password !== formData.confirmPassword) {
-        errors.confirmPassword = 'Passwords do not match';
-      }
-    } else if (formData.password) {
-      // If editing and password is provided, validate it
-      if (formData.password.length < 8) {
-        errors.password = 'Password must be at least 8 characters';
-      }
-      if (!formData.confirmPassword) {
-        errors.confirmPassword = 'Please confirm your password';
-      }
-      if (formData.password !== formData.confirmPassword) {
-        errors.confirmPassword = 'Passwords do not match';
-      }
-    }
-    
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -136,26 +98,53 @@ export default function UserForm({ editMode = false, initialData = {} }: UserFor
     setLoading(true);
     
     try {
-      // Create data object, removing confirmPassword
-      const userData = { ...formData };
-      delete (userData as any).confirmPassword;
+      // Create base user data with common fields
+      const baseUserData = {
+        email: formData.email,
+        first_name: formData.first_name,
+        last_name: formData.last_name
+      };
       
       if (editMode && initialData.email) {
-        // Update existing user
-        await api.users.updateUser(initialData.email, userData);
+        // Update existing user - exclude enabled status
+        console.log('Updating user:', baseUserData);
+        await api.users.updateUser(initialData.email, formData.first_name, formData.last_name);
       } else {
-        // Create new user
-        await api.users.createUser(userData);
+        // Create new user - include enabled status
+        const createUserData = {
+          ...baseUserData,
+          enabled: formData.enabled
+        };
+        console.log('Creating new user:', createUserData);
+        await api.users.createUser(createUserData);
       }
       
       setSuccess(true);
+      
+      // Clear session storage data
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('editUserData');
+      }
+      
       // Redirect after a brief delay
       setTimeout(() => {
         router.push('/users');
       }, 1500);
     } catch (err: any) {
       console.error('Error saving user:', err);
-      setError(err.message || 'Failed to save user. Please try again.');
+      
+      // Handle specific error cases based on API response
+      if (err.message && err.message.includes('already exists')) {
+        setError(`A user with this email already exists. Please use a different email address.`);
+      } else if (err.message && err.message.includes('must be provided')) {
+        setError(`Required fields are missing. Please make sure all required fields are filled.`);
+      } else if (err.message && err.message.toLowerCase().includes('unauthorized')) {
+        setError(`You don't have permission to perform this action. Please check your authorization.`);
+      } else if (err.message && err.message.toLowerCase().includes('internal server error')) {
+        setError(`The server encountered an internal error. Please try again or contact support if the issue persists.`);
+      } else {
+        setError(err.message || 'Failed to save user. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -226,27 +215,8 @@ export default function UserForm({ editMode = false, initialData = {} }: UserFor
             />
           </Grid>
           
-          {/* Role */}
-          <Grid item xs={12} sm={6}>
-            <TextField
-              select
-              label="Role"
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              fullWidth
-              disabled={loading}
-            >
-              {ROLES.map(role => (
-                <MenuItem key={role.value} value={role.value}>
-                  {role.label}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-          
           {/* Enabled Status */}
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12}>
             <FormControlLabel 
               control={
                 <Switch 
@@ -259,40 +229,6 @@ export default function UserForm({ editMode = false, initialData = {} }: UserFor
               } 
               label="Account Enabled"
               sx={{ height: '100%', display: 'flex', alignItems: 'center' }}
-            />
-          </Grid>
-          
-          {/* Password - only required for new users */}
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label={editMode ? "New Password (leave blank to keep current)" : "Password"}
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleChange}
-              fullWidth
-              required={!editMode}
-              error={!!formErrors.password}
-              helperText={formErrors.password || (editMode ? "Leave blank to keep current password" : "Must be at least 8 characters")}
-              disabled={loading}
-              autoComplete="new-password"
-            />
-          </Grid>
-          
-          {/* Confirm Password */}
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label="Confirm Password"
-              name="confirmPassword"
-              type="password"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              fullWidth
-              required={!editMode || !!formData.password}
-              error={!!formErrors.confirmPassword}
-              helperText={formErrors.confirmPassword}
-              disabled={loading || (editMode && !formData.password)}
-              autoComplete="new-password"
             />
           </Grid>
           
