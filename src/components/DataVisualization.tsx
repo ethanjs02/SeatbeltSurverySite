@@ -71,7 +71,8 @@ export default function DataVisualization() {
           setData(responseData as DataObject);
           
           // Set the first county as selected by default if there are counties
-          const counties = [...new Set(responseData.collections.map(item => item.county))];
+          const counties = [...new Set(((responseData as DataObject).collections || []).map((item: CollectionItem) => item.county))];
+
           if (counties.length > 0) {
             setSelectedCounty(counties[0]);
           }
