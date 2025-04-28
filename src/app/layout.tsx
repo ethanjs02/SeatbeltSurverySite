@@ -8,6 +8,15 @@ import { useRouter } from 'next/navigation';
 import theme from '../theme/theme';
 import '../app/globals.css';
 import AuthProvider, { useAuth } from '../contexts/AuthContext';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'AR Seatbelt Data Admin Site',
+  description: 'Data collection and visualization app',
+  icons: {
+    icon: '/favicon.png',
+  },
+};
 
 // Internal AppContent component to use auth context
 function AppContent({ children }: { children: ReactNode }) {
